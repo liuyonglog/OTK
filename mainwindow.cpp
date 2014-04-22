@@ -27,14 +27,14 @@ MainWindow::MainWindow(QWidget *parent) :
 	move((desktop->width()-600)/2,(desktop->height()-500)/2);
 
     index = 0;
-	setWindowTitle(tr("Image Viewer"));// window's name
+	setWindowTitle(tr("OTK Application"));// window's name
     resize(600, 500);// window's size
 	QIcon icon=QIcon("../OTK/Resources/pic_icon.png");
 	setWindowIcon(icon);
 
 	trayIcon=new QSystemTrayIcon(this);
 	trayIcon->setIcon(icon);
-	trayIcon->setToolTip("Image Viewer\n"
+	trayIcon->setToolTip("OTK Application\n"
 		"author: LY");
 	
 
@@ -553,8 +553,8 @@ void MainWindow::myClose()
 //关于本软件
 void MainWindow::about()//关于
  {
-     QMessageBox::about(this,tr("关于ImageViewer"),
-		 tr("<p><b>Image Viewer</b>是一个读图软件，"
+     QMessageBox::about(this,tr("关于OTK Application"),
+		 tr("<p><b>OTK Application</b>是一个读图软件，"
                 "可以用本软件实现图片浏览、图片打印、图片处理等"
                 "多种功能，此外还可以实现基于OPENCV的手势操控图片等  "
                 "后续功能正在添加中，敬请期待</p>\n<p>制作人：LY</p>"));
