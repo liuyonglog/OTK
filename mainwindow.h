@@ -36,6 +36,7 @@ public:
 	void OpenImage(QPixmap pix);
     Mat image;
     QString filename;
+	bool loadRAWFile(QString fileName);
 
     
 private:

@@ -5,7 +5,7 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QDate>
-
+#include <sys/stat.h>
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent), ui(new Ui::MainWindow)
 {
@@ -77,29 +77,114 @@ void MainWindow::captureFrame()
 
 void MainWindow::on_OpenImageFile()
 {
+	QString appFilter;
+	QString defaultPath = ".";
+	int m_nImageWidth=256;
+	__int64 m_nFileSizeWanted;
+	int nPercent=100;
+
+	struct _stat buf;
+	unsigned long* m_pDataRaw=NULL;
+	m_pDataRaw = new unsigned long[m_nImageWidth*m_nImageWidth];
+	memset(m_pDataRaw, 0, sizeof(unsigned long)*m_nImageWidth*m_nImageWidth);
+
+
+	appFilter += tr("RAW Files (*.raw *.RAW);;");
+	appFilter += tr("Image Files (*.jpg *.png *.bmp *.jpeg *.tiff *.tif *.dib *.jp2 *.jpe *.ppm *.pgm *.pbm *.ras *.sr);;");
+
     filename = QFileDialog::getOpenFileName(this,
-                                          tr("Open Image File"), ".",
-                                          tr("Image Files (*.jpg *.png *.bmp *.jpeg *.tiff *.tif *.dib *.jp2 *.jpe *.ppm *.pgm *.pbm *.ras *.sr)"));
+                                          tr("Open Image File"),
+                                          defaultPath, 
+										  appFilter);
     if (!filename.isEmpty()){
 
-        // now load the image
-		image = imread(filename.toLocal8Bit().data()/*.toStdString()*/, CV_LOAD_IMAGE_COLOR);   // Read the file
+		if(filename.contains(".raw"))
+		{
+			loadRAWFile(filename);
+		}
+		else
+		{
+			// now load the image
+			image = imread(filename.toLocal8Bit().data()/*.toStdString()*/, CV_LOAD_IMAGE_COLOR);   // Read the file
 
-        if(! image.data )                              // Check for invalid input
-        {
-            QMessageBox msgBox;
-            msgBox.setText("The selected image could not be opened!");
-            msgBox.show();
-            msgBox.exec();
-        }
-        else // If image file is fine. Show it in the label pixmap
-        {
-            QImage qigm=MatToQImage(image);
-			OpenImage(QPixmap::fromImage(qigm));
-            //ui->labelWebcam->setPixmap(QPixmap::fromImage(qigm).scaledToWidth(ui->labelWebcam->size().width(),Qt::FastTransformation));
-        }
+			if(! image.data )                              // Check for invalid input
+			{
+				QMessageBox msgBox;
+				msgBox.setText("The selected image could not be opened!");
+				msgBox.show();
+				msgBox.exec();
+			}
+			else // If image file is fine. Show it in the label pixmap
+			{
+				QImage qigm=MatToQImage(image);
+				OpenImage(QPixmap::fromImage(qigm));
+				//ui->labelWebcam->setPixmap(QPixmap::fromImage(qigm).scaledToWidth(ui->labelWebcam->size().width(),Qt::FastTransformation));
+			}
+		}
+
+
     }
 }
+
+bool MainWindow::loadRAWFile(QString fileName){
+
+	bool imgLoaded = true;
+
+	void *pData;
+	FILE * pFile;
+	unsigned char test[3];
+	unsigned char *buf;
+	int rohW = 7616;
+	int rohH = 5888;
+	pData = malloc(sizeof(unsigned char) * (rohW*rohH*3));
+	buf = (unsigned char *)malloc(sizeof(unsigned char) * (rohW*rohH));
+
+	try{
+		pFile = fopen (fileName.toStdString().c_str(), "rb" );
+
+		fread(pData, 3, rohW*rohH, pFile);
+
+		fclose(pFile);
+
+		for (long i=0; i < (rohW*rohH); i++){
+		
+			test[0] = ((unsigned char*)pData)[i*3];
+			test[1] = ((unsigned char*)pData)[i*3+1];
+			test[2] = ((unsigned char*)pData)[i*3+2];
+			//test[0] = test[0] >> 4;
+			//test[0] = test[0] & 15;
+			//test[1] = test[1] << 4;
+			//test[1] = test[1] & 240;
+
+			buf[i] = (test[0] & test[1] & test[2]);
+		
+		}
+
+		QImage qImg = QImage((const uchar*) buf, rohW, rohH, QImage::Format_Indexed8);
+
+		if (qImg.isNull())
+			return false;
+		//img = img.copy();
+		QVector<QRgb> colorTable;
+
+		for (int i = 0; i < 256; i++)
+			colorTable.push_back(QColor(i, i, i).rgb());
+		qImg.setColorTable(colorTable);
+
+		OpenImage(QPixmap::fromImage(qImg));
+
+	} catch(...) {
+		imgLoaded = false;
+	}
+	
+	free(buf);
+	free(pData);
+
+
+	return imgLoaded;
+
+}
+
 
 QImage MainWindow::MatToQImage(const Mat& mat)
 {
