@@ -135,32 +135,72 @@ bool MainWindow::loadRAWFile(QString fileName){
 	unsigned char test[3];
 	unsigned char *buf;
 	int rohW = 7616;
-	int rohH = 5888;
-	pData = malloc(sizeof(unsigned char) * (rohW*rohH*3));
+	int rohH = 3532;//5888;
+	pData = malloc(sizeof(unsigned char) * (rohW*rohH*5));
 	buf = (unsigned char *)malloc(sizeof(unsigned char) * (rohW*rohH));
 
 	try{
 		pFile = fopen (fileName.toStdString().c_str(), "rb" );
 
-		fread(pData, 3, rohW*rohH, pFile);
+		fread(pData, 5, rohW*rohH, pFile);
 
 		fclose(pFile);
 
-		for (long i=0; i < (rohW*rohH); i++){
-		
-			test[0] = ((unsigned char*)pData)[i*3];
-			test[1] = ((unsigned char*)pData)[i*3+1];
-			test[2] = ((unsigned char*)pData)[i*3+2];
-			//test[0] = test[0] >> 4;
-			//test[0] = test[0] & 15;
-			//test[1] = test[1] << 4;
-			//test[1] = test[1] & 240;
+		//for (long i=0; i < (rohW*rohH); i++){
+		//
+		//	test[0] = ((unsigned char*)pData)[i*3];
+		//	test[1] = ((unsigned char*)pData)[i*3+1];
+		//	test[2] = ((unsigned char*)pData)[i*3+2];
+		//	buf[i] = (test[0] | test[1] | test[2]);		
+		//}
 
-			buf[i] = (test[0] & test[1] & test[2]);
-		
+		int ccd_pixel_num=7600;
+		int MemAddressX=0,MemAddressY=0;
+		unsigned char	* ImageCurrentPosition;
+		int ColorOffset1st=0;
+		int ColorOffset3rd=0;
+		int ColorOffset=-2;
+		int OneLineOffsetGlobal=38080;
+		int SameCamImageUnitOffset=7616;
+		int line_offsetX=0;//Ndebug1009
+
+		unsigned char *ResultData[5];
+		for (long i=0; i < rohH; i++){
+			for (long j=0; j < rohW; j++){
+				for(int image_kind=0;image_kind<5;image_kind++)// 0:1st image data, 1:2nd red image data, 2:2nd green image data, 3:2nd blue image data, 4:3rd image data.
+				{
+					//Ndebug080125 ImageCurrentPosition=((unsigned char *)ImageDataRGBStart)+(SameCamImageUnitOffset-MemAddressY-1);
+					ImageCurrentPosition=((unsigned char*)pData)+i*5;//Ndebug080125
+					switch(image_kind)// Reflect color offset value
+					{
+					case 0:// 1st image data
+						line_offsetX-=ColorOffset1st;//Ndebug1009
+						//Ndebug1009 MemAddressX-=ColorOffset1st;
+						break;
+					case 1:// 2nd red image data
+						line_offsetX-=ColorOffset;//Ndebug1009
+						//Ndebug1009 MemAddressX-=ColorOffset;
+						break;
+					case 3:// 2nd blue image data
+						line_offsetX+=ColorOffset;//Ndebug1009
+						//Ndebug1009 MemAddressX+=ColorOffset;
+						break;
+					case 4:// 3rd image data
+						line_offsetX-=ColorOffset3rd;//Ndebug1009/STR56_800411NC01
+						//Ndebug1009 MemAddressX-=ColorOffset3rd;
+						break;
+					default:
+						break;
+					}
+					//Ndebug1009 ImageCurrentPosition+=MemAddressX*OneLineOffsetGlobal;
+					ImageCurrentPosition+=line_offsetX*OneLineOffsetGlobal;//Ndebug1009
+					ResultData[image_kind]=ImageCurrentPosition+SameCamImageUnitOffset*image_kind;
+				}
+				buf[j+i*SameCamImageUnitOffset]=((unsigned char*)pData)[j+i*OneLineOffsetGlobal+SameCamImageUnitOffset*0];;
+			}
 		}
 
-		QImage qImg = QImage((const uchar*) buf, rohW, rohH, QImage::Format_Indexed8);
+		QImage qImg = QImage(buf, rohW, rohH, QImage::Format_Indexed8);
 
 		if (qImg.isNull())
 			return false;
