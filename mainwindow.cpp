@@ -133,11 +133,15 @@ bool MainWindow::loadRAWFile(QString fileName){
 	void *pData;
 	FILE * pFile;
 	unsigned char test[3];
-	unsigned char *buf;
+	unsigned char *topBuf,*redBuf,*greenBuf,*buleBuf,*lowBuf;
 	int rohW = 7616;
 	int rohH = 3532;//5888;
 	pData = malloc(sizeof(unsigned char) * (rohW*rohH*5));
-	buf = (unsigned char *)malloc(sizeof(unsigned char) * (rohW*rohH));
+	topBuf = (unsigned char *)malloc(sizeof(unsigned char) * (rohW*rohH));
+	redBuf = (unsigned char *)malloc(sizeof(unsigned char) * (rohW*rohH));
+	greenBuf = (unsigned char *)malloc(sizeof(unsigned char) * (rohW*rohH));
+	buleBuf =(unsigned char *)malloc(sizeof(unsigned char) * (rohW*rohH));
+	lowBuf = (unsigned char *)malloc(sizeof(unsigned char) * (rohW*rohH));
 
 	try{
 		pFile = fopen (fileName.toStdString().c_str(), "rb" );
@@ -145,14 +149,6 @@ bool MainWindow::loadRAWFile(QString fileName){
 		fread(pData, 5, rohW*rohH, pFile);
 
 		fclose(pFile);
-
-		//for (long i=0; i < (rohW*rohH); i++){
-		//
-		//	test[0] = ((unsigned char*)pData)[i*3];
-		//	test[1] = ((unsigned char*)pData)[i*3+1];
-		//	test[2] = ((unsigned char*)pData)[i*3+2];
-		//	buf[i] = (test[0] | test[1] | test[2]);		
-		//}
 
 		int ccd_pixel_num=7600;
 		int MemAddressX=0,MemAddressY=0;
@@ -162,64 +158,95 @@ bool MainWindow::loadRAWFile(QString fileName){
 		int ColorOffset=-2;
 		int OneLineOffsetGlobal=38080;
 		int SameCamImageUnitOffset=7616;
-		int line_offsetX=0;//Ndebug1009
+		int line_offsetX=0;
 
 		unsigned char *ResultData[5];
 		for (long i=0; i < rohH; i++){
 			for (long j=0; j < rohW; j++){
 				for(int image_kind=0;image_kind<5;image_kind++)// 0:1st image data, 1:2nd red image data, 2:2nd green image data, 3:2nd blue image data, 4:3rd image data.
 				{
-					//Ndebug080125 ImageCurrentPosition=((unsigned char *)ImageDataRGBStart)+(SameCamImageUnitOffset-MemAddressY-1);
-					ImageCurrentPosition=((unsigned char*)pData)+i*5;//Ndebug080125
 					switch(image_kind)// Reflect color offset value
 					{
 					case 0:// 1st image data
-						line_offsetX-=ColorOffset1st;//Ndebug1009
-						//Ndebug1009 MemAddressX-=ColorOffset1st;
+						line_offsetX-=ColorOffset1st;
+						topBuf[j+i*SameCamImageUnitOffset]=((unsigned char*)pData)[j+i*OneLineOffsetGlobal+SameCamImageUnitOffset*image_kind];;
 						break;
 					case 1:// 2nd red image data
-						line_offsetX-=ColorOffset;//Ndebug1009
-						//Ndebug1009 MemAddressX-=ColorOffset;
+						line_offsetX-=ColorOffset;
+						redBuf[j+i*SameCamImageUnitOffset]=((unsigned char*)pData)[j+i*OneLineOffsetGlobal+SameCamImageUnitOffset*image_kind];;
+						break;
+					case 2:// 2nd Green image data
+						line_offsetX+=ColorOffset;
+						greenBuf[j+i*SameCamImageUnitOffset]=((unsigned char*)pData)[j+i*OneLineOffsetGlobal+SameCamImageUnitOffset*image_kind];;
 						break;
 					case 3:// 2nd blue image data
-						line_offsetX+=ColorOffset;//Ndebug1009
-						//Ndebug1009 MemAddressX+=ColorOffset;
+						line_offsetX+=ColorOffset;
+						buleBuf[j+i*SameCamImageUnitOffset]=((unsigned char*)pData)[j+i*OneLineOffsetGlobal+SameCamImageUnitOffset*image_kind];;
 						break;
 					case 4:// 3rd image data
-						line_offsetX-=ColorOffset3rd;//Ndebug1009/STR56_800411NC01
-						//Ndebug1009 MemAddressX-=ColorOffset3rd;
+						line_offsetX-=ColorOffset3rd;
+						lowBuf[j+i*SameCamImageUnitOffset]=((unsigned char*)pData)[j+i*OneLineOffsetGlobal+SameCamImageUnitOffset*image_kind];;
 						break;
 					default:
 						break;
 					}
-					//Ndebug1009 ImageCurrentPosition+=MemAddressX*OneLineOffsetGlobal;
-					ImageCurrentPosition+=line_offsetX*OneLineOffsetGlobal;//Ndebug1009
-					ResultData[image_kind]=ImageCurrentPosition+SameCamImageUnitOffset*image_kind;
 				}
-				buf[j+i*SameCamImageUnitOffset]=((unsigned char*)pData)[j+i*OneLineOffsetGlobal+SameCamImageUnitOffset*0];;
 			}
 		}
 
-		QImage qImg = QImage(buf, rohW, rohH, QImage::Format_Indexed8);
+		QImage qTopImg = QImage(topBuf, rohW, rohH, QImage::Format_Indexed8);
+		QImage qRedImg = QImage(redBuf, rohW, rohH, QImage::Format_Indexed8);
+		QImage qGreenImg = QImage(greenBuf, rohW, rohH, QImage::Format_Indexed8);
+		QImage qBuleImg = QImage(buleBuf, rohW, rohH, QImage::Format_Indexed8);
+		QImage qLowImg = QImage(lowBuf, rohW, rohH, QImage::Format_Indexed8);
 
-		if (qImg.isNull())
+		if (qTopImg.isNull())
 			return false;
-		//img = img.copy();
+
 		QVector<QRgb> colorTable;
 
 		for (int i = 0; i < 256; i++)
 			colorTable.push_back(QColor(i, i, i).rgb());
-		qImg.setColorTable(colorTable);
 
-		OpenImage(QPixmap::fromImage(qImg));
+		qTopImg.setColorTable(colorTable);
 
+		for (int i = 0; i < 256; i++)
+			colorTable.push_back(QColor(i, 128, 128).rgb());
+
+		qRedImg.setColorTable(colorTable);
+
+		for (int i = 0; i < 256; i++)
+			colorTable.push_back(QColor(128, i, 128).rgb());
+
+		qGreenImg.setColorTable(colorTable);
+
+		for (int i = 0; i < 256; i++)
+			colorTable.push_back(QColor(128, 128, i).rgb());
+
+		qBuleImg.setColorTable(colorTable);
+
+		for (int i = 0; i < 256; i++)
+			colorTable.push_back(QColor(i, i, i).rgb());
+
+		qLowImg.setColorTable(colorTable);
+
+		OpenImage(QPixmap::fromImage(qTopImg));
+		//QString saveFileName=fileName;
+		//qTopImg.save(saveFileName+"Top.png","PNG");
+		//qRedImg.save(saveFileName+"Red.png","PNG");
+		//qGreenImg.save(saveFileName+"Green.png","PNG");
+		//qBuleImg.save(saveFileName+"Bule.png","PNG");
+		//qLowImg.save(saveFileName+"Low.png","PNG");
 	} catch(...) {
 		imgLoaded = false;
 	}
 	
-	free(buf);
+	free(topBuf);
+	free(redBuf);
+	free(greenBuf);
+	free(buleBuf);
+	free(lowBuf);
 	free(pData);
-
 
 	return imgLoaded;
 
